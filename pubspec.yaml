@@ -1,8 +1,10 @@
 name: purple_otel_flutter
-description: OpenTelemetry auto-instrumentation for Flutter — navigation, lifecycle, error capture.
+description: OpenTelemetry auto-instrumentation for Flutter — navigation tracking, lifecycle monitoring, and error capture.
 version: 0.1.0
-license: Apache-2.0
-publish_to: none
+repository: https://xamapps.visualstudio.com/AI/_git/purple_otel_flutter
+homepage: https://pub.dev/packages/purple_otel_flutter
+topics: [opentelemetry, flutter, tracing, observability, navigation]
+license: AGPL-3.0
 
 environment:
   sdk: '>=3.2.0 <4.0.0'
