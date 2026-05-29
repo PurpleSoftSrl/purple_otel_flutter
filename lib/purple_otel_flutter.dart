@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart' show RouteSettings;
 import 'package:flutter/widgets.dart';
 import 'package:purple_otel_api/purple_otel_api.dart';
 import 'package:purple_otel_sdk/purple_otel_sdk.dart';
@@ -18,7 +17,8 @@ final class OtelNavigatorObserver extends NavigatorObserver {
       'navigate_to ${route.settings.name ?? '/'}',
       kind: SpanKind.internal,
     );
-    span.setAttribute('screen.name', AttributeValue.string(route.settings.name ?? '/'));
+    span.setAttribute(
+        'screen.name', AttributeValue.string(route.settings.name ?? '/'));
     _activeSpans[route] = span;
   }
 
@@ -42,7 +42,8 @@ final class OtelNavigatorObserver extends NavigatorObserver {
         'navigate_to ${newRoute.settings.name ?? '/'}',
         kind: SpanKind.internal,
       );
-      span.setAttribute('screen.name', AttributeValue.string(newRoute.settings.name ?? '/'));
+      span.setAttribute(
+          'screen.name', AttributeValue.string(newRoute.settings.name ?? '/'));
       _activeSpans[newRoute] = span;
     }
   }
@@ -77,8 +78,10 @@ final class FlutterOtelInitializer {
         details.exception,
         stackTrace: details.stack,
       );
-      span.setAttribute('error.library', AttributeValue.string(details.library));
-      span.setAttribute('error.context', AttributeValue.string(details.context?.toString() ?? ''));
+      span.setAttribute(
+          'error.library', AttributeValue.string(details.library ?? ''));
+      span.setAttribute('error.context',
+          AttributeValue.string(details.context?.toString() ?? ''));
       span.setStatus(SpanStatus.error(details.exceptionAsString()));
       span.end();
 
