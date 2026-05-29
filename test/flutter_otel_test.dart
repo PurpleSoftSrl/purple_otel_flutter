@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:purple_otel_api/purple_otel_api.dart';
 import 'package:purple_otel_flutter/purple_otel_flutter.dart';
 import 'package:purple_otel_sdk/purple_otel_sdk.dart';
 
@@ -172,3 +171,4 @@ void main() {
     });
   });
 }
+
