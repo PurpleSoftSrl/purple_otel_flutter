@@ -1,6 +1,6 @@
 name: purple_otel_flutter
 description: OpenTelemetry auto-instrumentation for Flutter — navigation tracking, lifecycle monitoring, and error capture.
-version: 0.1.1
+version: 0.1.2
 repository: https://github.com/purplesoftsrl/purple_otel_flutter
 homepage: https://github.com/purplesoftsrl/purple_otel_flutter
 topics: [opentelemetry, flutter, tracing, observability]
