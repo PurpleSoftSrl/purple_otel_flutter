@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io' show Platform;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
@@ -7,9 +8,24 @@ import 'package:purple_otel_sdk/purple_otel_sdk.dart';
 
 final class OtelNavigatorObserver extends NavigatorObserver {
   final Tracer _tracer;
+
+  /// Optional hook to derive the span/`screen.name` for a route, mirroring
+  /// `SentryNavigatorObserver.routeNameExtractor`. When null (the default) the
+  /// observer falls back to `route.settings.name ?? '/'`. Useful for naming
+  /// routes hosted in nested navigators (e.g. per-tab) where `settings.name`
+  /// alone is ambiguous.
+  final String? Function(RouteSettings settings)? _routeNameExtractor;
+
   final Map<Route, Span> _activeSpans = {};
 
-  OtelNavigatorObserver({required Tracer tracer}) : _tracer = tracer;
+  OtelNavigatorObserver({
+    required Tracer tracer,
+    String? Function(RouteSettings settings)? routeNameExtractor,
+  })  : _tracer = tracer,
+        _routeNameExtractor = routeNameExtractor;
+
+  String _routeName(Route route) =>
+      _routeNameExtractor?.call(route.settings) ?? route.settings.name ?? '/';
 
   @override
   void didPush(Route route, Route? previousRoute) {
@@ -17,7 +33,7 @@ final class OtelNavigatorObserver extends NavigatorObserver {
       final oldSpan = _activeSpans.remove(route);
       oldSpan?.end();
 
-      final name = route.settings.name ?? '/';
+      final name = _routeName(route);
       final span = _tracer.startSpan(
         'navigate_to $name',
         kind: SpanKind.internal,
@@ -46,7 +62,7 @@ final class OtelNavigatorObserver extends NavigatorObserver {
         span?.end();
       }
       if (newRoute != null) {
-        final name = newRoute.settings.name ?? '/';
+        final name = _routeName(newRoute);
         final span = _tracer.startSpan(
           'navigate_to $name',
           kind: SpanKind.internal,
@@ -87,8 +103,7 @@ final class OtelWidgetsBindingObserver with WidgetsBindingObserver {
         'lifecycle_${state.name}',
         kind: SpanKind.internal,
       );
-      span.setAttribute(
-          'app.lifecycle', AttributeValue.string(state.name));
+      span.setAttribute('app.lifecycle', AttributeValue.string(state.name));
       span.setStatus(SpanStatus.ok);
       span.end();
     } catch (_) {}
@@ -113,21 +128,21 @@ final class FlutterOtelInitializer {
 
     final tracer = tracerProvider.get('flutter');
     final previousFlutterErrorHandler = FlutterError.onError;
-    final previousPlatformErrorHandler =
-        PlatformDispatcher.instance.onError;
+    final previousPlatformErrorHandler = PlatformDispatcher.instance.onError;
 
     FlutterError.onError = (FlutterErrorDetails details) {
       _safe(() {
-        final span =
-            tracer.startSpan('flutter-error', kind: SpanKind.internal);
+        final span = tracer.startSpan('flutter-error', kind: SpanKind.internal);
         span.recordException(
           details.exception,
           stackTrace: details.stack,
         );
         span.setAttribute('error.library',
             AttributeValue.string(_limit(details.library ?? '', 128)));
-        span.setAttribute('error.context',
-            AttributeValue.string(_limit(details.context?.toString() ?? '', 256)));
+        span.setAttribute(
+            'error.context',
+            AttributeValue.string(
+                _limit(details.context?.toString() ?? '', 256)));
         span.setStatus(
             SpanStatus.error(_limit(details.exceptionAsString(), 256)));
         span.end();
@@ -138,14 +153,12 @@ final class FlutterOtelInitializer {
       } catch (_) {}
     };
 
-    PlatformDispatcher.instance.onError =
-        (Object error, StackTrace stack) {
+    PlatformDispatcher.instance.onError = (Object error, StackTrace stack) {
       _safe(() {
-        final span = tracer.startSpan(
-            'platform-error', kind: SpanKind.internal);
+        final span =
+            tracer.startSpan('platform-error', kind: SpanKind.internal);
         span.recordException(error, stackTrace: stack);
-        span.setStatus(
-            SpanStatus.error(_limit(error.toString(), 256)));
+        span.setStatus(SpanStatus.error(_limit(error.toString(), 256)));
         span.end();
       });
 
@@ -166,6 +179,49 @@ final class FlutterOtelInitializer {
   static String _limit(String value, int maxLength) {
     if (value.length <= maxLength) return value;
     return '${value.substring(0, maxLength - 3)}...';
+  }
+}
+
+/// A [ResourceDetector] that populates the standard OpenTelemetry resource
+/// attributes available to a Flutter/Dart runtime without extra plugins:
+/// `telemetry.sdk.*` (static) and `os.type`/`os.name`/`os.version` (from
+/// `dart:io Platform`).
+///
+/// Merge its [detect] output into the provider [Resource] alongside the
+/// app-supplied `service.*`/`deployment.environment` attributes for fuller
+/// OTel resource conformance and portable dashboards. Device attributes
+/// (`device.*`) are intentionally omitted to avoid a `device_info_plus`
+/// dependency.
+final class FlutterResourceDetector implements ResourceDetector {
+  const FlutterResourceDetector();
+
+  /// The `telemetry.sdk.version` reported — the purple_otel_flutter version.
+  static const String sdkVersion = '0.1.3';
+
+  @override
+  Resource detect() {
+    final attrs = <String, AttributeValue>{
+      'telemetry.sdk.name': const AttributeValue.string('purple_otel'),
+      'telemetry.sdk.language': const AttributeValue.string('dart'),
+      'telemetry.sdk.version': const AttributeValue.string(sdkVersion),
+    };
+    try {
+      attrs['os.type'] = AttributeValue.string(_osType);
+      attrs['os.name'] = AttributeValue.string(Platform.operatingSystem);
+      attrs['os.version'] =
+          AttributeValue.string(Platform.operatingSystemVersion);
+    } catch (_) {
+      // Platform may be unavailable (e.g. some test hosts) — os.* is best-effort.
+    }
+    return Resource(Attributes.of(attrs));
+  }
+
+  /// Maps the Dart platform onto the OTel `os.type` well-known values.
+  String get _osType {
+    if (Platform.isIOS || Platform.isMacOS) return 'darwin';
+    if (Platform.isAndroid || Platform.isLinux) return 'linux';
+    if (Platform.isWindows) return 'windows';
+    return Platform.operatingSystem;
   }
 }
 
