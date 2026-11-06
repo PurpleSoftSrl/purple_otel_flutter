@@ -27,7 +27,7 @@ dependencies:
   flutter:
     sdk: flutter
   purple_otel_sdk: ^0.1.0
-  purple_otel_flutter: ^0.1.0
+  purple_otel_flutter: ^0.1.6
 ```
 
 This package depends on [`purple_otel_sdk`](https://pub.dev/packages/purple_otel_sdk) for `TracerProvider`, `Span`, `SpanExporter`, and OTLP export. Configure your SDK first, then wire in the Flutter instrumentation.
